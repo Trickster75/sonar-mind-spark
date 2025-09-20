@@ -1,92 +1,114 @@
 import { useState } from "react";
 import { useToast } from "@/components/ui/use-toast";
 
-interface Source {
-  title: string;
-  url: string;
-  snippet: string;
-  domain: string;
+interface Disease {
+  name: string;
+  probability: number;
+  description: string;
+  symptoms: string[];
+  treatments: string[];
+  severity: "mild" | "moderate" | "severe";
 }
 
-interface SearchResult {
-  query: string;
-  answer: string;
-  sources: Source[];
+interface DiagnosisResult {
+  symptoms: string;
+  diseases: Disease[];
+  generalAdvice: string;
   timestamp: Date;
 }
 
-export const useSearch = () => {
-  const [results, setResults] = useState<SearchResult[]>([]);
+// Medical knowledge base for local diagnosis
+const medicalKnowledgeBase = {
+  "fever": {
+    diseases: [
+      { name: "Common Cold", description: "Viral infection affecting upper respiratory tract", symptoms: ["fever", "cough", "runny nose", "sore throat"], treatments: ["Rest", "Fluids", "Paracetamol", "Throat lozenges"], severity: "mild" as const },
+      { name: "Flu", description: "Influenza viral infection", symptoms: ["fever", "body aches", "fatigue", "headache"], treatments: ["Rest", "Antiviral medication", "Pain relievers", "Plenty of fluids"], severity: "moderate" as const },
+      { name: "COVID-19", description: "SARS-CoV-2 viral infection", symptoms: ["fever", "cough", "loss of taste", "fatigue"], treatments: ["Isolation", "Rest", "Monitor symptoms", "Consult doctor"], severity: "moderate" as const }
+    ]
+  },
+  "headache": {
+    diseases: [
+      { name: "Tension Headache", description: "Stress-related headache", symptoms: ["headache", "neck stiffness", "stress"], treatments: ["Rest", "Pain relievers", "Stress management", "Hydration"], severity: "mild" as const },
+      { name: "Migraine", description: "Severe recurring headache disorder", symptoms: ["severe headache", "nausea", "light sensitivity"], treatments: ["Dark room", "Migraine medication", "Rest", "Cold compress"], severity: "moderate" as const }
+    ]
+  },
+  "cough": {
+    diseases: [
+      { name: "Common Cold", description: "Viral infection affecting upper respiratory tract", symptoms: ["cough", "runny nose", "sore throat"], treatments: ["Cough syrup", "Honey", "Steam inhalation", "Rest"], severity: "mild" as const },
+      { name: "Bronchitis", description: "Inflammation of bronchial tubes", symptoms: ["persistent cough", "mucus", "chest discomfort"], treatments: ["Bronchodilators", "Expectorants", "Rest", "Fluids"], severity: "moderate" as const }
+    ]
+  },
+  "stomach pain": {
+    diseases: [
+      { name: "Gastritis", description: "Inflammation of stomach lining", symptoms: ["stomach pain", "nausea", "bloating"], treatments: ["Antacids", "Avoid spicy foods", "Small meals", "PPI medications"], severity: "mild" as const },
+      { name: "Food Poisoning", description: "Foodborne illness", symptoms: ["stomach pain", "vomiting", "diarrhea"], treatments: ["Hydration", "BRAT diet", "Electrolyte solutions", "Rest"], severity: "moderate" as const }
+    ]
+  }
+};
+
+export const useMedicalDiagnosis = () => {
+  const [results, setResults] = useState<DiagnosisResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
-  const search = async (query: string) => {
+  const diagnose = async (symptoms: string) => {
     setIsLoading(true);
     
     try {
-      // Simulate AI-powered search with web results
-      // In a real implementation, this would call your backend API
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Simulate AI analysis
+      await new Promise(resolve => setTimeout(resolve, 1500));
       
-      const mockSources: Source[] = [
-        {
-          title: "Latest AI Research Developments - ArXiv",
-          url: "https://arxiv.org/list/cs.AI/recent",
-          snippet: "Recent publications in artificial intelligence research covering machine learning, neural networks, and computational intelligence.",
-          domain: "arxiv.org"
-        },
-        {
-          title: "AI News and Updates - MIT Technology Review",
-          url: "https://www.technologyreview.com/topic/artificial-intelligence/",
-          snippet: "Breaking news and analysis on artificial intelligence developments, featuring expert insights and industry trends.",
-          domain: "technologyreview.com"
-        },
-        {
-          title: "OpenAI Research Papers",
-          url: "https://openai.com/research/",
-          snippet: "Latest research publications from OpenAI covering language models, robotics, and AI safety.",
-          domain: "openai.com"
+      const symptomsLower = symptoms.toLowerCase();
+      const possibleDiseases: Disease[] = [];
+      
+      // Simple keyword matching for demonstration
+      Object.entries(medicalKnowledgeBase).forEach(([symptom, data]) => {
+        if (symptomsLower.includes(symptom)) {
+          data.diseases.forEach(disease => {
+            const matchingSymptoms = disease.symptoms.filter(s => 
+              symptomsLower.includes(s.toLowerCase())
+            );
+            const probability = (matchingSymptoms.length / disease.symptoms.length) * 100;
+            
+            if (probability > 20) {
+              possibleDiseases.push({
+                ...disease,
+                probability: Math.min(probability, 95)
+              });
+            }
+          });
         }
-      ];
+      });
 
-      const mockAnswer = `Based on the latest information from across the web, here are the key developments in AI:
+      // Sort by probability
+      possibleDiseases.sort((a, b) => b.probability - a.probability);
+      
+      // Remove duplicates
+      const uniqueDiseases = possibleDiseases.filter((disease, index, self) =>
+        index === self.findIndex(d => d.name === disease.name)
+      );
 
-**Recent Breakthroughs:**
-• Advanced language models are showing improved reasoning capabilities and reduced hallucinations
-• Multimodal AI systems are becoming more sophisticated, combining text, image, and audio processing
-• AI safety research is accelerating with new alignment techniques and interpretability methods
+      const generalAdvice = "This is an AI-generated analysis for informational purposes only. Please consult a healthcare professional for proper medical diagnosis and treatment. If symptoms are severe or persistent, seek immediate medical attention.";
 
-**Industry Trends:**
-• Major tech companies are increasing AI infrastructure investments
-• Open-source AI models are becoming more competitive with proprietary solutions
-• Regulatory frameworks are being developed in multiple countries
-
-**Research Focus Areas:**
-• Efficient training methods to reduce computational costs
-• Better human-AI collaboration interfaces
-• Solving complex scientific problems through AI assistance
-
-The field continues to evolve rapidly with new papers published daily on platforms like ArXiv and significant commercial applications being deployed across industries.`;
-
-      const newResult: SearchResult = {
-        query,
-        answer: mockAnswer,
-        sources: mockSources,
+      const newResult: DiagnosisResult = {
+        symptoms,
+        diseases: uniqueDiseases.slice(0, 5), // Top 5 matches
+        generalAdvice,
         timestamp: new Date()
       };
 
       setResults(prev => [newResult, ...prev]);
       
       toast({
-        title: "Search completed",
-        description: "Found relevant information with sources",
+        title: "Analysis completed",
+        description: `Found ${uniqueDiseases.length} possible conditions`,
       });
       
     } catch (error) {
-      console.error("Search error:", error);
+      console.error("Diagnosis error:", error);
       toast({
-        title: "Search failed",
-        description: "Could not complete the search. Please try again.",
+        title: "Analysis failed",
+        description: "Could not complete the analysis. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -97,6 +119,6 @@ The field continues to evolve rapidly with new papers published daily on platfor
   return {
     results,
     isLoading,
-    search
+    diagnose
   };
 };
